@@ -6,12 +6,7 @@ var bodyParser = require("body-parser");
 var mongodb = require("mongodb");
 var ObjectID = mongodb.ObjectID;
 var fs = require('fs');
-
 var constants = require('./constants');
-var COL_USERS = "users";
-var COL_EARTHQUAKE = "earthquake";
-var COL_SLACK_MESSAGES = "slackMessages";
-
 
 var app = express();
 app.use(express.static(__dirname + "/public"));
@@ -28,7 +23,7 @@ mongodb.MongoClient.connect(constants.MONGODB_URI, function (err, database) {
   }
 
   // Ensure indexes
-  database.collection(COL_USERS).createIndex({androidId:1},{unique:true});
+  database.collection(constants.COL_USERS).createIndex({androidId:1},{unique:true});
 
   // Save database object from the callback for reuse.
   db = database;
@@ -62,7 +57,7 @@ app.post("/users", function(req, res) {
     return;
   }
 
-  db.collection(COL_USERS).insertOne(newUser, function(err, doc) {
+  db.collection(constants.COL_USERS).insertOne(newUser, function(err, doc) {
     if (err) {
       handleError(res, err.message, "Failed to create new contact.");
     } else {
@@ -72,7 +67,7 @@ app.post("/users", function(req, res) {
 });
 
 app.get("/slack/messages", function(req, res) {
-  db.collection(COL_SLACK_MESSAGES).find({}).toArray(function(err, docs) {
+  db.collection(constants.COL_SLACK_MESSAGES).find({}).toArray(function(err, docs) {
     if (err) {
       handleError(res, err.message, "Failed to get slack messages.");
     } else {
@@ -90,7 +85,7 @@ app.post("/slack/message/save", function(req, res) {
     handleError(res, "Invalid body", "Not a valid request.", 400);
   }
 
-  db.collection(COL_SLACK_MESSAGES).insertOne(newSlackMessage, function(err, doc) {
+  db.collection(constants.COL_SLACK_MESSAGES).insertOne(newSlackMessage, function(err, doc) {
     if (err) {
       handleError(res, err.message, "Failed to save message.");
     } else {
