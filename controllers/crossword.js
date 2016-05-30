@@ -4,18 +4,64 @@ var constants = require('../constants');
 
 var crossword = {
 
-  getSolution: function(req, res, done) {
+  getSolution: function(req, res, db, done) {
     var text = req.query.text;
-    var pattern = req.query.pattern;
+    var pattern = this._parsePattern(req.query.pattern);
     var qs = {c0:text, p0:pattern};
-    var j = constants.CROSSWORD_URLS.length;
-    for (i=0;i<j;i++) {
-      var url = constants.CROSSWORD_URLS[i];
-      this._scrape(url, qs, (e, r) => {
-        done(null, r);
-      });
-    }
 
+    this._checkDB(qs, db, (e, r) => {
+      if (e) {
+        done(e);
+      } else if (r) {
+      // database entry exists
+        done(null, r.solutions);
+      } else {
+      // scrape from URL list
+        var j = constants.CROSSWORD_URLS.length;
+        for (i=0;i<j;i++) {
+          var url = constants.CROSSWORD_URLS[i];
+          this._scrape(url, qs, (e, r) => {
+            db.collection(constants.COL_CROSSWORD_SOLUTIONS).update(
+            {clue: qs.c0},
+            {"$push":
+              {pattern: qs.p0},
+             // adding to global solutions array
+             "$addToSet":
+              {solutions: {"$each": r}}
+            },
+            {upsert: true}
+            );
+            done(null, r);
+          });
+        }
+      }
+    });
+  },
+
+  _parsePattern: function(pattern) {
+    upper = pattern.toUpperCase();
+    singleSymbol = upper.replace(/[_?!*#$]/g,"_");
+    underscored = singleSymbol.replace(/([0-9])/g, function(x) {
+      return "_".repeat(x);
+    });
+    parsed = underscored.replace(/_+/g, function(x){
+      return x.length;
+    });
+    return parsed;
+  },
+
+  _checkDB: function(qs, db, done) {
+    db.collection(constants.COL_CROSSWORD_SOLUTIONS).findOne({
+      clue: qs.c0,
+      pattern: qs.p0
+    }, function(err, doc) {
+      if (err) {
+        done(err);
+      }
+      else {
+        done(null, doc);
+      }
+    });
   },
 
   _scrape: function(url, qs, done) {
@@ -35,7 +81,7 @@ var crossword = {
         var result = {};
         if ($(this).find('img').length > 0) {
           result.text = $(this).find('a').text();
-          result.count = $(this).find('img').length;
+          result.count = 5 - $(this).find('img[width=11]').length;
           results[index] = result;
           index++;
         }

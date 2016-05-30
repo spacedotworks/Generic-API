@@ -102,12 +102,12 @@ app.get("/crossword/solve", function(req, res){
     handleError(res, "Not a valid request", "Parameters missing");
   }
   var module = require("./controllers/crossword.js");
-  module.crossword.getSolution(req, res, (err, data) => {
+  module.crossword.getSolution(req, res, db, (err, data) => {
     if (err) {
       handleError(res, "Server is not responding", "Server is not responding");
     }
     else {
-      res.send(data);
+      res.status(200).json(data);
     }
   });
 });
