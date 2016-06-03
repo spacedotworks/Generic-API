@@ -15,26 +15,39 @@ var crossword = {
       };
       this._checkDB(qs, db, (e, r) => {
         if (e) {
-          done(e);
+          return done(e);
         } else if (r) {
         // database entry exists
-          done(null, r);
+          return done(null, r);
         } else {
         // scrape from URL list
           var j = constants.CROSSWORD_URLS.length;
-          for (i=0;i<j;i++) {
-            var url = constants.CROSSWORD_URLS[i];
-            this._scrape(url, qs, (e, qr) => {
+          var i = 0;
+          var url = constants.CROSSWORD_URLS;
+          this._scrape(url[i], qs, (e, qr) => {
+            if (e) {
+              this._scrape(url[i+1], qs, (q, qr) => {
+                if (e) {
+                  return done('please try again');
+                } else {
+                  this._writeQuery(db, qs);
+                  this._writeSolution(db, qs, qr);
+                  return done(null, qr);
+                }
+              });
+            } else {
+              done(null, qr);
               this._writeQuery(db, qs);
               this._writeSolution(db, qs, qr);
-            });
-          }
+              return;
+            }
+          });
         }
       });
     });
   },
 
-  _writeSolution: function(db, qs, results, done) {
+  _writeSolution: function(db, qs, results) {
     let result;
     while (result = results.pop()) {
       db.collection(constants.COL_CROSSWORD_SOLUTIONS).update(
@@ -85,8 +98,8 @@ var crossword = {
     db.collection(constants.COL_CROSSWORD_QUERIES).findOne({
       clue: qs.c0,
       pattern: qs.p0
-    }, function(err, doc) {
-      if (err) {
+    }, (err, doc) => {
+      if (err || doc == null) {
         return done(err);
       }
       if (doc) {
@@ -101,7 +114,7 @@ var crossword = {
           return done(null, results);
         });
       }
-      done(null, null);
+      //done(null, null);
     });
   },
 
@@ -126,6 +139,9 @@ var crossword = {
   },
 
   _getUsage: function(db, uid, done) {
+    if (uid == constants.CROSSWORD_PRO_UID) {
+      return done(null, 1);
+    }
     db.collection(constants.COL_CROSSWORD_USAGE).update(
     {
       uid: uid,
