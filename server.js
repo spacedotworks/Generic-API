@@ -26,6 +26,7 @@ mongodb.MongoClient.connect(constants.MONGODB_URI, function (err, database) {
   database.collection(constants.COL_USERS).createIndex({androidId:1},{unique:true});
   database.collection(constants.COL_CROSSWORD_SOLUTIONS).createIndex({terms:"text"});
   database.collection(constants.COL_CROSSWORD_SOLUTIONS).createIndex({text:1});
+  database.collection(constants.COL_CROSSWORD_USAGE).createIndex({uid:1},{unique: true});
   // Save database object from the callback for reuse.
   db = database;
   console.log("Database connection ready");
@@ -104,10 +105,11 @@ app.get("/crossword/solve", function(req, res){
   }
   var module = require("./controllers/crossword.js");
   module.crossword.getSolution(req, res, db, (err, data) => {
-    if (err) {
-      handleError(res, "Server is not responding", "Server is not responding");
-    }
-    else {
+    if (err == 'limit reached') {
+      res.status(400).json(JSON.stringify({message: 'Daily limit reached'}));
+    } else if (err) {
+      handleError(res, "Server is not responding", "Server is not responding", 500);
+    } else {
       res.status(200).json(data);
     }
   });

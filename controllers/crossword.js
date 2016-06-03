@@ -5,27 +5,32 @@ var constants = require('../constants');
 var crossword = {
 
   getSolution: function(req, res, db, done) {
+    var uid = req.query.uid;
     var text = req.query.text;
     var pattern = this._parsePattern(req.query.pattern);
     var qs = {c0:text, p0:pattern};
-
-    this._checkDB(qs, db, (e, r) => {
-      if (e) {
-        done(e);
-      } else if (r) {
-      // database entry exists
-        done(null, r);
-      } else {
-      // scrape from URL list
-        var j = constants.CROSSWORD_URLS.length;
-        for (i=0;i<j;i++) {
-          var url = constants.CROSSWORD_URLS[i];
-          this._scrape(url, qs, (e, qr) => {
-            this._writeQuery(db, qs);
-            this._writeSolution(db, qs, qr);
-          });
+    this._getUsage(db, uid, (e, r) => {
+      if (e || r == 0) {
+        return done('limit reached');
+      };
+      this._checkDB(qs, db, (e, r) => {
+        if (e) {
+          done(e);
+        } else if (r) {
+        // database entry exists
+          done(null, r);
+        } else {
+        // scrape from URL list
+          var j = constants.CROSSWORD_URLS.length;
+          for (i=0;i<j;i++) {
+            var url = constants.CROSSWORD_URLS[i];
+            this._scrape(url, qs, (e, qr) => {
+              this._writeQuery(db, qs);
+              this._writeSolution(db, qs, qr);
+            });
+          }
         }
-      }
+      });
     });
   },
 
@@ -120,8 +125,28 @@ var crossword = {
     });
   },
 
-  getUsage: function(req,res) {
-    console.log(false);
+  _getUsage: function(db, uid, done) {
+    db.collection(constants.COL_CROSSWORD_USAGE).update(
+    {
+      uid: uid,
+      count: {
+        $lt: 18
+      }
+    },
+    {
+      $inc: {
+        count: 1
+      }
+    },
+    {
+      upsert: true
+    }, (e, r) => {
+      if (e) {
+        done(e)
+      } else {
+        done(null, r.result.nModified);
+      }
+    });
   }
 };
 
