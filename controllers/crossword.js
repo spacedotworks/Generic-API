@@ -144,7 +144,7 @@ var crossword = {
       if (e) {
         done(e)
       } else {
-        done(null, r.result.nModified);
+        done(null, r.result.n);
       }
     });
   }
