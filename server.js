@@ -24,7 +24,8 @@ mongodb.MongoClient.connect(constants.MONGODB_URI, function (err, database) {
 
   // Ensure indexes
   database.collection(constants.COL_USERS).createIndex({androidId:1},{unique:true});
-
+  database.collection(constants.COL_CROSSWORD_SOLUTIONS).createIndex({terms:"text"});
+  database.collection(constants.COL_CROSSWORD_SOLUTIONS).createIndex({text:1});
   // Save database object from the callback for reuse.
   db = database;
   console.log("Database connection ready");

@@ -14,53 +14,89 @@ var crossword = {
         done(e);
       } else if (r) {
       // database entry exists
-        done(null, r.solutions);
+        done(null, r);
       } else {
       // scrape from URL list
         var j = constants.CROSSWORD_URLS.length;
         for (i=0;i<j;i++) {
           var url = constants.CROSSWORD_URLS[i];
-          this._scrape(url, qs, (e, r) => {
-            db.collection(constants.COL_CROSSWORD_SOLUTIONS).update(
-            {clue: qs.c0},
-            {"$push":
-              {pattern: qs.p0},
-             // adding to global solutions array
-             "$addToSet":
-              {solutions: {"$each": r}}
-            },
-            {upsert: true}
-            );
-            done(null, r);
+          this._scrape(url, qs, (e, qr) => {
+            this._writeQuery(db, qs);
+            this._writeSolution(db, qs, qr);
           });
         }
       }
     });
   },
 
+  _writeSolution: function(db, qs, results, done) {
+    let result;
+    while (result = results.pop()) {
+      db.collection(constants.COL_CROSSWORD_SOLUTIONS).update(
+        {
+          text: result,
+        },
+        {
+          $addToSet: {
+            terms: qs.c0
+          }
+        },
+        {
+          upsert: true,
+          multi:true,
+        }
+      , (e, r) => {
+      });
+    }
+  },
+
+  _writeQuery: function(db, qs) {
+    db.collection(constants.COL_CROSSWORD_QUERIES).update(
+      {
+        clue: qs.c0
+      },
+      {
+        $addToSet: {
+          pattern: qs.p0
+        }
+      },
+      {
+        upsert: true,
+      }
+    , (e, r) => {
+    });
+  },
+
   _parsePattern: function(pattern) {
-    upper = pattern.toUpperCase();
-    singleSymbol = upper.replace(/[_?!*#$]/g,"_");
-    underscored = singleSymbol.replace(/([0-9])/g, function(x) {
-      return "_".repeat(x);
+    let singleSymbol = pattern.replace(/[_?!*#$]/g,".");
+    let dotted = singleSymbol.replace(/([0-9])/g, function(x) {
+      return ".".repeat(x);
     });
-    parsed = underscored.replace(/_+/g, function(x){
-      return x.length;
-    });
+    let parsed = dotted.toUpperCase();
     return parsed;
   },
 
   _checkDB: function(qs, db, done) {
-    db.collection(constants.COL_CROSSWORD_SOLUTIONS).findOne({
+    db.collection(constants.COL_CROSSWORD_QUERIES).findOne({
       clue: qs.c0,
       pattern: qs.p0
     }, function(err, doc) {
       if (err) {
-        done(err);
+        return done(err);
       }
-      else {
-        done(null, doc);
+      if (doc) {
+        db.collection(constants.COL_CROSSWORD_SOLUTIONS).find({
+          text: new RegExp('^' + qs.p0 + '$'),
+          $text: {$search: qs.c0},
+        }).toArray((e, doc) =>{
+          let results = [];
+          doc.forEach(function(row) {
+            results.push(row.text);
+          })
+          return done(null, results);
+        });
       }
+      done(null, null);
     });
   },
 
@@ -71,24 +107,17 @@ var crossword = {
       qs:qs
     }, (e, r, b) => {
       if (e || r.statusCode == '404') {
-        done(e);
+        return done(e);
       }
       $ = cheerio.load(b);
       var rows = $('#myform table table[cellpadding=6]').find('tr');
-      var index = 0;
       rows.each(function(i, elem) {
-        // only return rows with stars
-        var result = {};
         if ($(this).find('img').length > 0) {
-          result.text = $(this).find('a').text();
-          result.count = 5 - $(this).find('img[width=11]').length;
-          results[index] = result;
-          index++;
+          results.push($(this).find('a').text());
         }
       });
       done(null, results);
     });
-    return;
   },
 
   getUsage: function(req,res) {
