@@ -74,7 +74,7 @@ var crossword = {
 
   _parsePattern: function(pattern) {
     let singleSymbol = pattern.replace(/[_?!*#$]/g,".");
-    let dotted = singleSymbol.replace(/([0-9])/g, function(x) {
+    let dotted = singleSymbol.replace(/([0-9]+)/g, function(x) {
       return ".".repeat(x);
     });
     let parsed = dotted.toUpperCase();
