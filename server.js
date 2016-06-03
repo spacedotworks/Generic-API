@@ -7,6 +7,7 @@ var mongodb = require("mongodb");
 var ObjectID = mongodb.ObjectID;
 var fs = require('fs');
 var constants = require('./constants');
+var schedule = require('node-schedule');
 
 var app = express();
 app.use(express.static(__dirname + "/public"));
@@ -30,6 +31,11 @@ mongodb.MongoClient.connect(constants.MONGODB_URI, function (err, database) {
   // Save database object from the callback for reuse.
   db = database;
   console.log("Database connection ready");
+
+  // Cron job to remove
+  var cron = schedule.scheduleJob('0 55 16 * * *', function() {
+    db.collection(constants.COL_CROSSWORD_USAGE).remove({});
+  });
 
   // Initialize the app.
   var server = app.listen(process.env.PORT || 3000, function () {
@@ -110,7 +116,7 @@ app.get("/crossword/solve", function(req, res){
     } else if (err) {
       handleError(res, "Server is not responding", "Server is not responding", 500);
     } else {
-      res.status(200).json(data);
+      res.status(200).send(data.join("\n"));
     }
   });
 });
